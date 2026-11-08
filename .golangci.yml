@@ -1,0 +1,172 @@
+version: "2"
+
+run:
+  timeout: 5m
+  tests: false
+
+output:
+  formats:
+    text:
+      path: stdout
+
+issues:
+  max-same-issues: 0
+
+formatters:
+  enable:
+    - gofmt
+    - gofumpt
+    - goimports
+    - golines
+  settings:
+    goimports:
+      local-prefixes:
+        - github.com/aisbergg/go-flock
+
+    gofumpt:
+      extra:
+        group-params: true
+        clothe-returns: true
+        balance-calls: true
+
+    golines:
+      max-len: 120
+      tab-len: 4
+      shorten-comments: false
+      reformat-tags: true
+      chain-split-dots: true
+
+linters:
+  default: none
+  enable:
+    - asciicheck
+    - bidichk
+    - bodyclose
+    - contextcheck
+    - decorder
+    - dupl
+    - dupword
+    - durationcheck
+    - errchkjson
+    - errname
+    - exhaustive
+    - exptostd
+    - fatcontext
+    - forbidigo
+    - gocheckcompilerdirectives
+    - goconst
+    - gocritic
+    - godoclint
+    - goheader
+    - gosec
+    - gosmopolitan
+    - govet
+    - importas
+    - inamedparam
+    - ineffassign
+    - intrange
+    - ireturn
+    - loggercheck
+    - makezero
+    - misspell
+    - modernize
+    - musttag
+    - nakedret
+    - nilerr
+    - noctx
+    - nolintlint
+    - nosprintfhostport
+    - perfsprint
+    - prealloc
+    - predeclared
+    - protogetter
+    - reassign
+    - recvcheck
+    - revive
+    - rowserrcheck
+    - sloglint
+    - spancheck
+    - sqlclosecheck
+    - staticcheck
+    - tagliatelle
+    - unconvert
+    - unparam
+    - unqueryvet
+    - unused
+    - usestdlibvars
+    - usetesting
+    - wastedassign
+
+  exclusions:
+    paths:
+      - "playground/.*"
+    presets:
+      # See https://golangci-lint.run/usage/false-positives/#exclusion-presets
+      - common-false-positives
+      - std-error-handling
+    rules:
+      - path: _test\.go
+        linters:
+          - dupl # Common false positives with table driven tests
+          - dupword # Messes with test cases more often than not
+          - gochecknoglobals # Flags and env vars
+          - goconst # Sometimes repetition is okay in tests
+          - gosec # Tests don't need security stuff
+          - prealloc # These kinds of optimisations will make no difference to test code
+
+  settings:
+    revive:
+      severity: "warning"
+      confidence: 0.8
+      enable-all-rules: true
+      rules:
+        - name: add-constant
+          disabled: true
+        - name: flag-parameter
+          disabled: true
+        - name: empty-lines
+          disabled: true
+        - name: blank-imports
+          disabled: true
+        - name: file-header
+          disabled: true
+        - name: max-public-structs
+          disabled: true
+        - name: line-length-limit
+          disabled: true
+        - name: function-length
+          disabled: true
+        - name: banned-characters
+          disabled: true
+        - name: unused-receiver
+          disabled: true
+        - name: cyclomatic
+          disabled: true
+        - name: cognitive-complexity
+          disabled: true
+        - name: comment-spacings
+          disabled: true
+
+        - name: unhandled-error
+          severity: warning
+        - name: argument-limit
+          arguments: [6]
+        - name: function-result-limit
+          arguments: [3]
+
+    exhaustive:
+      check: [switch, map]
+      default-signifies-exhaustive: false
+
+    gosec:
+      excludes:
+        - G104 # Errors not checked: To many irrelevant results, e.g. WriteString, WriteByte, etc.
+
+    modernize:
+      disable:
+        - slicesbackward
+
+    nolintlint:
+      # Workaround for golangci-lint cache bug that causes false "unused nolint" reports.
+      # See: https://github.com/golangci/golangci-lint/issues/3228
+      allow-unused: true

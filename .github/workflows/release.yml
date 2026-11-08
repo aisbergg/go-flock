@@ -1,0 +1,41 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - v*
+
+jobs:
+  create-github-release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Extract release notes
+        id: extract-release-notes
+        uses: ffurrer2/extract-release-notes@v3
+
+      - name: Detect prerelease
+        id: detect-prerelease
+        run: |
+          TAG="${{ github.ref_name }}"
+          if [[ "$TAG" =~ -rc|-beta|-alpha|-dev|-pre ]]; then
+            echo "prerelease=true" >> $GITHUB_OUTPUT
+          else
+            echo "prerelease=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create release
+        uses: softprops/action-gh-release@v3
+        with:
+          draft: false
+          prerelease: ${{ steps.detect-prerelease.outputs.prerelease }}
+          body: ${{ steps.extract-release-notes.outputs.release_notes }}
+
+      - name: Trigger pkg.go.dev update
+        uses: wei/curl@v1.1.1
+        with:
+          args: https://sum.golang.org/lookup/github.com/aisbergg/go-flock@${{ github.ref_name }}

@@ -1,0 +1,15 @@
+# Changes here will be overwritten by Copier
+_commit: 0dd90c2
+_src_path: /home/andre/Cloud/Syncthing/Arbeitsplatz/Code/templates/go
+author_name: André Lehmann
+default_branch: main
+description: Coordinate access between processes using OS-level file locking. Prevent race conditions when multiple instances of your app run simultaneously. Simple API, powerful guarantees.
+github_url: https://github.com/aisbergg/go-flock
+github_username: aisbergg
+go_version: '1.27'
+license: BSD-3-Clause
+min_go_version: '1.26'
+module_path: github.com/aisbergg/go-flock
+project_name: Flock
+project_slug: go-flock
+project_type: library

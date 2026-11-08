@@ -1,0 +1,34 @@
+# Project specific
+/playground
+
+# IDE
+/.vscode
+/.idea
+/.zed
+
+# OSX
+.DS_Store
+
+# Binaries for programs and plugins
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+__debug_bin*
+
+# Test binary, built with `go test -c`
+*.test
+fuzz/
+
+# Output of the go coverage tool, specifically when used with LiteIDE
+*.out
+
+# Go workspace sum file
+go.work.sum
+
+# Copier
+.copier-answers.yml
+
+# AI agents and assistants
+AGENTS.md

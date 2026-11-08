@@ -1,0 +1,254 @@
+# mise configuration file (https://mise.en.dev)
+#
+# This file defines the tools and tasks for the project.
+
+[tools]
+go = "1.27"
+
+# Go linter and formatter aggregator.
+# Used in this repo to format code, run lint checks, and apply safe auto-fixes.
+# https://golangci-lint.run/
+golangci-lint = "2.14.0"
+
+# Opinionated formatter for various text-based files.
+# Used here to keep Markdown, TOML, and other supported project files consistently formatted.
+# https://prettier.io/
+prettier = "3.9.9"
+
+# Git hooks runner.
+# Used here to execute pre-commit checks locally via the configured lefthook workflow.
+# https://lefthook.dev/
+lefthook = "2.1.15"
+
+# Go documentation generator that emits Markdown from package docs.
+# Used here to build the API reference files under docs/reference/**/README.md from the packages in pkg/.
+# https://github.com/princjef/gomarkdoc
+"go:github.com/princjef/gomarkdoc/cmd/gomarkdoc" = "v1.1.0"
+
+# Fast spell checker for source, docs, and configuration files.
+# Used in this project to catch and prevent typos as part of the formatting/check pipeline.
+# https://github.com/crate-ci/typos
+typos = "1.50.3"
+
+# Link checker for Markdown and other text content.
+# Used here to verify that documentation links in the repository stay valid.
+# https://github.com/lycheeverse/lychee
+lychee = "0.24.2"
+
+# Secret scanner for finding hardcoded credentials and tokens.
+# Used in this project to detect committed secrets before they land in the repository history.
+# https://github.com/Yelp/detect-secrets
+"pipx:detect-secrets" = "1.5.0"
+
+# JSON processor for shell scripts and CI pipelines.
+# Used in this repo to create a check-mode for the `detect-secrets` task.
+# https://github.com/jqlang/jq
+jq = "1.8.2"
+
+# Go vulnerability checker that scans dependencies against known CVEs.
+# Used here to audit the project for security vulnerabilities before release.
+# https://pkg.go.dev/golang.org/x/vuln/cmd/govulncheck
+"go:golang.org/x/vuln/cmd/govulncheck" = "v1.8.0"
+
+
+# ------------------------------------------------------------------------------
+# Auto-Fix tasks
+# ------------------------------------------------------------------------------
+
+[tasks.format]
+description = "Format all"
+depends = [
+    "format-go",
+    "format-prettier",
+]
+
+[tasks.format-go]
+description = "Format and lint via golangci-lint"
+run = "golangci-lint fmt && go fix ./... && golangci-lint run --fix"
+
+[tasks.format-prettier]
+description = "Auto-format text files with prettier (accepts files)"
+run = """
+#!/usr/bin/env bash
+set -e
+prettier --write "${@-.}"
+"""
+
+
+# ------------------------------------------------------------------------------
+# Generation tasks
+# ------------------------------------------------------------------------------
+
+[tasks.generate]
+description = "Run go generate for all packages"
+run = "go generate ./..."
+
+[tasks.mod-tidy]
+description = "Tidy go modules for Go 1.27"
+run = "go mod tidy -go 1.27"
+
+[tasks.create-secrets-baseline]
+description = "Creates the secrets baseline for detecting secrets added to the repository"
+run = """
+git add .
+detect-secrets scan --exclude-files .secrets.baseline --exclude-files .copier-answers.yml > .secrets.baseline
+"""
+
+
+# ------------------------------------------------------------------------------
+# Docs tasks
+# ------------------------------------------------------------------------------
+
+[tasks.docs-make]
+description = "Generate documentation as markdown files (docs/reference/**/README.md)"
+run = """
+cd pkg
+gomarkdoc -o '../docs/reference/{% raw %}{{.Dir}}{% endraw %}/README.md' --repository.url=https://github.com/aisbergg/go-flock --repository.default-branch=main ./...
+"""
+
+[tasks.docs-serve]
+description = "Serve Go documentation"
+run = "go doc -http"
+
+
+# ------------------------------------------------------------------------------
+# Test tasks
+# ------------------------------------------------------------------------------
+
+[tasks.test]
+description = "Run tests with race detector and optimizations disabled"
+run = "go test -race -v -gcflags '-N -l' ./..."
+
+[tasks.test-coverage]
+description = "Run tests with coverage"
+run = "go test -short -coverprofile cover.out -covermode=atomic -gcflags '-N -l' ./pkg/... ./internal/..."
+
+[tasks.test-display-coverage]
+description = "Display test coverage in browser"
+depends = ["test-coverage"]
+run = "go tool cover -html=cover.out"
+
+[tasks.test-fuzz]
+description = "Run fuzz tests"
+run = """
+./tools/fuzz_all.sh "${FUZZ_TIME:-1m}"
+"""
+
+[tasks.bench]
+description = "Run benchmarks (set BENCHMARK env var to filter)"
+run = """
+BENCHMARK=${BENCHMARK:-.}
+go test -benchmem -bench="^${BENCHMARK}" ./pkg/... ./internal/...
+"""
+
+[tasks.bench-compare]
+description = "Run comparative benchmarks in `./benchmarks` dir"
+run = """
+BENCHMARK=${BENCHMARK:-BenchmarkCompare}
+cd benchmarks
+go test -benchmem -bench="^${BENCHMARK}" ./...
+"""
+
+
+# ------------------------------------------------------------------------------
+# Check tasks
+# ------------------------------------------------------------------------------
+
+[tasks.check-hygiene]
+description =  "Run all repository checks"
+depends = [
+    "check-generated",
+    "check-format",
+    "check-lint",
+    "check-links",
+    "check-secrets",
+    "check-vulns",
+    "check-typos",
+]
+
+[tasks.check-generated]
+description = "Regenerate derived files and fail if the repo changes"
+run = """
+go generate ./...
+go mod tidy -go 1.27
+cd pkg
+gomarkdoc -o '../docs/reference/{% raw %}{{.Dir}}{% endraw %}/README.md' --repository.url=https://github.com/aisbergg/go-flock --repository.default-branch=main ./...
+cd ..
+git diff --exit-code
+"""
+
+[tasks.check-format]
+description = "Verify formatting and spelling checks without changing tracked files"
+run = """
+golangci-lint fmt
+prettier --check .
+typos .
+git diff --exit-code
+"""
+
+[tasks.check-lint]
+description = "Run golangci-lint against the library packages (accepts arbitrary args)"
+usage = 'arg "[args]" var=#true'
+run = """
+#!/usr/bin/env bash
+set -eo pipefail
+eval "args=($usage_args)"
+golangci-lint run "${args[@]}"
+"""
+
+[tasks.check-vulns]
+description = "Scan Go dependencies for known vulnerabilities"
+run = "govulncheck ./..."
+
+[tasks.check-secrets]
+description = "Check repository for newly introduced secrets"
+run = "bash .github/detect-secrets.sh"
+
+[tasks.check-links]
+description = "Verify repository links resolve (accepts files)"
+run = """
+#!/usr/bin/env bash
+set -e
+lychee --no-progress "${@-.}"
+"""
+
+[tasks.check-typos]
+description = "Check spelling with typos (accepts files)"
+run = """
+#!/usr/bin/env bash
+set -e
+typos "${@-.}"
+"""
+
+
+# ------------------------------------------------------------------------------
+# Template tasks
+# ------------------------------------------------------------------------------
+
+[tasks.update-template]
+description = "Update project from copier template"
+run = "copier update --defaults"
+
+
+# ------------------------------------------------------------------------------
+# Release tasks
+# ------------------------------------------------------------------------------
+
+[tasks.release-tag]
+description = "Stage a release (requires VERSION env var)"
+depends = ["check-hygiene", "test"]
+run = """
+if [ -z "$VERSION" ]; then
+  echo "ERR: You have to specify the next release version (e.g. 'VERSION=v0.0.0')!"
+  exit 1
+fi
+if ! git diff-index --quiet HEAD --; then
+  echo "ERR: You have uncommitted changes. Please stash them before creating a release!"
+  exit 1
+fi
+git tag -s -a "$VERSION" -m "$VERSION"
+"""
+
+[tasks.release-push]
+description = "Push a release to remote (warning: ensure release was staged properly)"
+run = "git push && git push --follow-tags"

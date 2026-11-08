@@ -1,0 +1,64 @@
+# Lefthook configuration file (https://lefthook.dev)
+colors: false
+
+pre-commit:
+  parallel: true
+  commands:
+    check-typos:
+      exclude:
+        - "pkg/**/*.md"
+        - "docs/reference/**/README.md"
+      run: mise run check-typos
+      file_types: text
+
+    check-secrets:
+      exclude:
+        - "pkg/**/*.md"
+        - "docs/reference/**/README.md"
+      run: mise run check-secrets
+
+    check-links:
+      glob: "*.md"
+      exclude:
+        - "pkg/**/*.md"
+        - "docs/reference/**/README.md"
+        - "CHANGELOG.md"
+      run: mise run check-links -- {staged_files}
+
+    # all other pre-commit tasks need to be run in sequence
+    pre-commit-serial:
+      run: lefthook run pre-commit-serial
+      env:
+        LEFTHOOK_QUIET: execution_info,meta,skips,summary
+
+# called by `pre-commit`
+pre-commit-serial:
+  parallel: false
+  commands:
+    generate:
+      run: mise run generate
+
+    check-mod-change:
+      run: mise run mod-tidy
+
+    format:
+      glob: "*.go"
+      run: mise run format
+      stage_fixed: true
+
+    make-docs:
+      glob: "*.go"
+      run: mise run docs-make
+      stage_fixed: true
+
+    check-vulns:
+      glob: "go.mod"
+      run: mise run check-vulns
+
+pre-push:
+  follow: true
+  piped: true
+  commands:
+    tests:
+      glob: "*.go"
+      run: mise run test
